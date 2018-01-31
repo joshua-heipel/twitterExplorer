@@ -38,9 +38,10 @@ ui <- shinyUI(
                                       hydrology = c("discharge", "erosion", "flash_flood", "flow_velocity", "irrigation_canals", "sediment_deposition", "storm_surge", "water_discoloration", "water_level", "water_temperature"), 
                                       phenology = c("animal_phenology", "number_of_animals", "plant_phenology", "seasons"), 
                                       society = c("affected_people", "damages", "human_health", "mitigation", "pollution", "reasoning", "religious_rituals", "social_problems", "traffic", "warnings")),
-                       multiple = TRUE, size=25,
+                       multiple = TRUE, size = 50,
                        options = list(
                          placeholder = "<Select label>",
+                         create = TRUE,
                          onInitialize = I('function() { this.setValue(""); }')
                        )
       )),

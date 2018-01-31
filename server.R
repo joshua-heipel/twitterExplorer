@@ -11,7 +11,7 @@ library(rtweet)
 
 # main
 searchTwitter <- function(query, n) {
-  if (!is.null(query) & query != "") {
+  if (!is.null(query) && query != "") {
     tweets <- search_tweets(query, n = n, include_rts = FALSE, type="recent", 
                             retryonratelimit = FALSE, verbose = FALSE,
                             lang = lang)
@@ -43,13 +43,24 @@ server <- shinyServer(function(input, output) {
   observeEvent(
     input$searchButton,
     {
-      tweets <- isolate(searchTwitter(input$inputQuery, as.numeric(input$number)))
-      tweets <- flatten_tweets(tweets)
-      if (verbose) {
-        View(tweets)
+      vals$data <- isolate(searchTwitter(input$inputQuery, as.numeric(input$number)))
+      if (!is.null(vals$data) && nrow(vals$data) > 0) {
+        vals$data <- flatten_tweets(vals$data)
+        if (verbose) {
+          View(vals$data)
+        }
+        vals$data <- vals$data
+        output$data <- DT::renderDataTable({
+          return(vals$data[cols])
+        },
+        server = TRUE, 
+        escape = FALSE,
+        filter = "none",
+        options = list(searching=FALSE, caseInsensitive=TRUE, smart=TRUE, 
+                       columnDefs = list(list(targets = c(5), searchable=FALSE)))
+        )
       }
-      vals$data <- tweets
-    }, 
+    },
     ignoreInit = TRUE)
 
   observeEvent(
@@ -59,37 +70,39 @@ server <- shinyServer(function(input, output) {
       if (is.na(vals$dirname)) {
         vals$dirname <- "data"
       }
-      print(vals$dirname)
     },
     ignoreInit = TRUE)
   
   observeEvent(
     input$downloadTweetsButton,
     {
-      try(dir.create(vals$dirname, showWarnings = FALSE))
-      if (file.exists(paste(vals$dirname, "tweets.csv", sep="/"))) {
-        col.names = FALSE
-      } else {
-        col.names = TRUE
+      if (!is.null(vals$data) && nrow(vals$data) > 0) {
+        try(dir.create(vals$dirname, showWarnings = FALSE))
+        if (file.exists(paste(vals$dirname, "tweets.csv", sep="/"))) {
+          col.names = FALSE
+        } else {
+          col.names = TRUE
+        }
+        write.table(vals$data[input$data_rows_selected,-c(ncol(vals$data))], 
+                    paste(vals$dirname, "tweets.csv", sep="/"), sep = ",", row.names = FALSE, 
+                    fileEncoding = "UTF-8", append = TRUE, col.names = col.names)  
       }
-      write.table(vals$data[input$data_rows_selected,-c(ncol(vals$data))], 
-                  paste(vals$dirname, "tweets.csv", sep="/"), sep = ",", row.names = FALSE, 
-                  fileEncoding = "UTF-8", append = TRUE, col.names = col.names)
     },
     ignoreInit = TRUE)
-  
   
   observeEvent(
     input$downloadImagesButton,
     {
-      try(dir.create(vals$dirname, showWarnings = FALSE))
-      image_ids <- intersect(which(vals$data$media_type == "photo"),
-                             input$data_rows_selected)
-      if (length(image_ids)) {
-        image_tweets <- vals$data[image_ids, c("status_id", "media_url")]
-        apply(image_tweets, 1, function(x) try(download.file(x[2],
-                                                             paste(vals$dirname, "/", x[1],".jpg",sep=""), "auto", quiet = TRUE, mode = "wb")))
-      }  
+      if (!is.null(vals$data) && nrow(vals$data) > 0) {
+        try(dir.create(vals$dirname, showWarnings = FALSE))
+        image_ids <- intersect(which(vals$data$media_type == "photo"),
+                               input$data_rows_selected)
+        if (length(image_ids)) {
+          image_tweets <- vals$data[image_ids, c("status_id", "media_url")]
+          apply(image_tweets, 1, function(x) try(download.file(x[2],
+                                                               paste(vals$dirname, "/", x[1],".jpg",sep=""), "auto", quiet = TRUE, mode = "wb")))
+        }  
+      }
     },
     ignoreInit = TRUE)
   
@@ -99,19 +112,6 @@ server <- shinyServer(function(input, output) {
     }, 
     ignoreInit = TRUE)
 
-  output$data <- DT::renderDataTable({
-    # cols <- c("text", "hashtags", "lang", "label", "image")
-    if (is.null(vals$data)) {
-      dummy <- data.frame(matrix(NA, 1, 5))
-      names(dummy) <- cols
-      return(dummy)
-    }
-    return(vals$data[cols])
-  }, 
-  escape = FALSE,
-  filter = "none",
-  options = list(searching=FALSE, caseInsensitive=TRUE, smart=TRUE, 
-                 columnDefs = list(list(targets = c(5), searchable=FALSE))))
 })
 
 # output$image = renderUI({
