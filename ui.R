@@ -20,9 +20,10 @@ ui <- shinyUI(
     position = "left",
     
     sidebarPanel(
-      textInput(inputId = "inputQuery", label = NULL, placeholder = "Query...", width="75%"),
+      textInput(inputId = "inputQuery", label = NULL, placeholder = "<Search query>", width="75%"),
       actionButton(inputId = "searchButton", label = "Search"),
       p(sliderInput(inputId = "number", label = "Number of Tweets", min = 1, max = 1000, value = 100)),
+      actionButton(inputId = "chooseDirectoryButton", label = "Choose directory"),
       actionButton(inputId = "downloadTweetsButton", label = "Download Tweets"),
       actionButton(inputId = "downloadImagesButton", label = "Download Images"),
       width=8
@@ -39,11 +40,11 @@ ui <- shinyUI(
                                       society = c("affected_people", "damages", "human_health", "mitigation", "pollution", "reasoning", "religious_rituals", "social_problems", "traffic", "warnings")),
                        multiple = TRUE, size=25,
                        options = list(
-                         placeholder = "Select label...",
+                         placeholder = "<Select label>",
                          onInitialize = I('function() { this.setValue(""); }')
                        )
       )),
-      p(actionButton(inputId = "labelButton", label = "Label selected Tweets")),
+      p(actionButton(inputId = "labelButton", label = "Label Tweets")),
       # h2("Results"),
       DT::dataTableOutput(outputId = "data", width="100%", height="auto"),
       width = 12

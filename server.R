@@ -1,7 +1,7 @@
 # options
-verbose = TRUE
+verbose = FALSE
 cols    = c("text", "hashtags", "lang", "label", "image")
-lang    = "de"
+lang    = NULL
 
 # load packages
 library(shiny)
@@ -38,6 +38,7 @@ flatten_tweets <- function(tweets) {
 server <- shinyServer(function(input, output) {
 
   vals <- reactiveValues()
+  vals$dirname <- "data"
   
   observeEvent(
     input$searchButton,
@@ -52,16 +53,27 @@ server <- shinyServer(function(input, output) {
     ignoreInit = TRUE)
 
   observeEvent(
+    input$chooseDirectoryButton,
+    {
+      vals$dirname <- choose.dir(".", caption="Select folder")
+      if (is.na(vals$dirname)) {
+        vals$dirname <- "data"
+      }
+      print(vals$dirname)
+    },
+    ignoreInit = TRUE)
+  
+  observeEvent(
     input$downloadTweetsButton,
     {
-      dir.create("data", showWarnings = FALSE)
-      if (file.exists("data/tweets.csv")) {
+      try(dir.create(vals$dirname, showWarnings = FALSE))
+      if (file.exists(paste(vals$dirname, "tweets.csv", sep="/"))) {
         col.names = FALSE
       } else {
         col.names = TRUE
       }
       write.table(vals$data[input$data_rows_selected,-c(ncol(vals$data))], 
-                  "data/tweets.csv", sep = ",", row.names = FALSE, 
+                  paste(vals$dirname, "tweets.csv", sep="/"), sep = ",", row.names = FALSE, 
                   fileEncoding = "UTF-8", append = TRUE, col.names = col.names)
     },
     ignoreInit = TRUE)
@@ -70,15 +82,14 @@ server <- shinyServer(function(input, output) {
   observeEvent(
     input$downloadImagesButton,
     {
-      dir.create("data", showWarnings = FALSE)
+      try(dir.create(vals$dirname, showWarnings = FALSE))
       image_ids <- intersect(which(vals$data$media_type == "photo"),
                              input$data_rows_selected)
       if (length(image_ids)) {
         image_tweets <- vals$data[image_ids, c("status_id", "media_url")]
         apply(image_tweets, 1, function(x) try(download.file(x[2],
-                                                             paste("data/", x[1],".jpg",sep=""),
-                                                             "auto", quiet = TRUE, mode = "wb")))
-      }
+                                                             paste(vals$dirname, "/", x[1],".jpg",sep=""), "auto", quiet = TRUE, mode = "wb")))
+      }  
     },
     ignoreInit = TRUE)
   
