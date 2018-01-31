@@ -52,8 +52,9 @@ server <- shinyServer(function(input, output) {
     ignoreInit = TRUE)
 
   observeEvent(
-    input$downloadButton,
+    input$downloadTweetsButton,
     {
+      dir.create("data", showWarnings = FALSE)
       if (file.exists("data/tweets.csv")) {
         col.names = FALSE
       } else {
@@ -62,13 +63,21 @@ server <- shinyServer(function(input, output) {
       write.table(vals$data[input$data_rows_selected,-c(ncol(vals$data))], 
                   "data/tweets.csv", sep = ",", row.names = FALSE, 
                   fileEncoding = "UTF-8", append = TRUE, col.names = col.names)
+    },
+    ignoreInit = TRUE)
+  
+  
+  observeEvent(
+    input$downloadImagesButton,
+    {
+      dir.create("data", showWarnings = FALSE)
       image_ids <- intersect(which(vals$data$media_type == "photo"),
                              input$data_rows_selected)
       if (length(image_ids)) {
         image_tweets <- vals$data[image_ids, c("status_id", "media_url")]
         apply(image_tweets, 1, function(x) try(download.file(x[2],
-                                               paste("data/", x[1],".jpg",sep=""),
-                                               "auto", quiet = TRUE, mode = "wb")))
+                                                             paste("data/", x[1],".jpg",sep=""),
+                                                             "auto", quiet = TRUE, mode = "wb")))
       }
     },
     ignoreInit = TRUE)

@@ -23,7 +23,8 @@ ui <- shinyUI(
       textInput(inputId = "inputQuery", label = NULL, placeholder = "Query...", width="75%"),
       actionButton(inputId = "searchButton", label = "Search"),
       p(sliderInput(inputId = "number", label = "Number of Tweets", min = 1, max = 1000, value = 100)),
-      actionButton(inputId = "downloadButton", label = "Download"),
+      actionButton(inputId = "downloadTweetsButton", label = "Download Tweets"),
+      actionButton(inputId = "downloadImagesButton", label = "Download Images"),
       width=8
     ),
     
