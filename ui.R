@@ -46,12 +46,8 @@ ui <- shinyUI(
                        )
       )),
       p(actionButton(inputId = "labelButton", label = "Label Tweets")),
-      # h2("Results"),
       DT::dataTableOutput(outputId = "data", width="100%", height="auto"),
       width = 12
     )
   )
 ))
-
-# downloadButton(outputId = "downloadData", label = "Download selected Tweets"),
-# shinyFilesButton(id = "fileButton", label = "Directory", title="Something", multiple=FALSE),

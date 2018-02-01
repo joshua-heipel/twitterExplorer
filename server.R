@@ -1,7 +1,7 @@
 # options
-verbose = FALSE
-cols    = c("text", "hashtags", "lang", "label", "image")
-lang    = NULL
+verbose   = FALSE
+cols      = c("text", "hashtags", "lang", "label", "image")
+language  = NULL
 
 # load packages
 library(shiny)
@@ -9,125 +9,212 @@ library(shinyFiles)
 library(DT)
 library(rtweet)
 
-# main
 searchTwitter <- function(query, n) {
+
   if (!is.null(query) && query != "") {
-    tweets <- search_tweets(query, n = n, include_rts = FALSE, type="recent", 
+
+    # search for tweets for the given query, number n, and language
+    tweets <- search_tweets(query, n = n, include_rts = FALSE, type="recent",
                             retryonratelimit = FALSE, verbose = FALSE,
-                            lang = lang)
-    return(tweets)
+                            lang = language)
+
+    return(flattenTweets(tweets))
   }
 }
 
-flatten_tweets <- function(tweets) {
+flattenTweets <- function(tweets) {
+
+  if (is.null(tweets)) return()
+
+  # search columns that contain lists instead of single values
   col_ids <- which(sapply(tweets, mode) == "list" & names(tweets) != "hashtags")
-  tweets[col_ids] <- lapply(tweets[col_ids], function(x) 
-    sapply(x, function(y) if (!is.na(y[1])) paste(y, collapse = " ") else NA))
-  tweets$hashtags <- sapply(tweets$hashtags, function(x) if (!is.na(x[1])) 
-    paste("#", x, sep="", collapse=" ") else NA)
-  Encoding(tweets$text) <- "UTF-8"
+
+  # paste values to a string
+  tweets[col_ids] <- lapply(tweets[col_ids], function(x)
+    sapply(x, function(y) ifelse(is.na(y[1]), NA , paste(y, collapse = " "))))
+
+  # paste column 'hashtags' to single string with leading #s
+  tweets$hashtags <- sapply(tweets$hashtags, function(x) ifelse(is.na(x[1]),
+    NA, paste("#", x, sep="", collapse=" ")))
+
+  # prepend ids (see ?write_as_csv)
   tweets$status_id <- paste("x", tweets$status_id, sep="")
-  fotoIds <- which(tweets$media_type == "photo")
+
+  # add columns for label and prediction
   tweets["label"] <- NA
   tweets["predicted"] <- NA
+
+  # construct image urls
   tweets["image"] <- NA
-  tweets$image[fotoIds] <- paste('<img src="', tweets$media_url[fotoIds], '">', sep="")
+  fotoIds <- which(tweets$media_type == "photo")
+  tweets$image[fotoIds] <- paste('<a href="', tweets$media_url[fotoIds], '"><img src="', tweets$media_url[fotoIds], '"></a>', sep="")
+
+  # remove eof
+  tweets$text <- gsub("\n", " ", tweets$text)
+  
+  # inspect data in R if verbose
+  if (verbose) {
+    View(tweets)
+  }
+
   return(tweets)
+}
+
+writeTweets <- function(dir, data) {
+  
+  # handle user interruption
+  if(is.na(dir)) return()
+
+  # create directory
+  if(!dir.exists(dir)) dir.create(dir, showWarnings = FALSE)
+
+  # append tweets to an existing file
+  if (file.exists(paste(dir, "tweets.csv", sep="/"))) {
+    colnames = FALSE
+    append = TRUE
+  } else {
+    colnames = TRUE
+    append = FALSE
+  }
+  
+  # write file
+  write.table(data, paste(dir, "tweets.csv", sep="/"), sep = ",", row.names = FALSE,
+              fileEncoding = "UTF-8", append = append, col.names = colnames)
+}
+
+writeImages <- function(dir, image_tweets) {
+
+  # handle user interruption
+  if(is.na(dir)) return()
+  
+  # create directory
+  if(!dir.exists(dir)) dir.create(dir, showWarnings = FALSE)
+  
+  # download images
+  apply(image_tweets, 1, function(x) try(download.file(x[2],
+    paste(dir, "/", x[1],".jpg",sep=""), "auto", quiet = TRUE, mode = "wb")))
 }
 
 server <- shinyServer(function(input, output) {
 
   vals <- reactiveValues()
-  vals$dirname <- "data"
+  folder <- NA
 
-  render <- function() {
-    # try(rsoworder <- input$data_state$order)
-    # try(print(input$data_state$order[[1]]))
-    # print(roworder)
-    # print(isolate(input$toList()))
-    output$data <- DT::renderDataTable(vals$data[,cols],
-                                       server = TRUE, 
-                                       escape = FALSE,
-                                       filter = "none",
-                                       options = list(searching=FALSE, caseInsensitive=TRUE, smart=TRUE, 
-                                                      columnDefs = list(list(targets = c(5), searchable=FALSE)),
-                                                      stateSave = FALSE)
-    # order = list(list(5, "desc")), 
-    )
-  }
+  # observer to render the data returned by twitter API call
+  observe({
+
+    # only render if data available
+    if (!is.null(vals$tweets) && nrow(vals$tweets)) {
+      
+      # side effect instead of return value
+      output$data <- DT::renderDataTable(
+        vals$tweets[,cols], server = TRUE, escape = FALSE, filter = "none",
+        options = list(searching=FALSE, caseInsensitive=TRUE, smart=TRUE,
+                       columnDefs = list(list(targets = c(5), searchable=FALSE)),
+                       stateSave = FALSE)
+      )
+    }
+  })
     
+  
+  # render <- function() {
+  #   # try(rsoworder <- input$data_state$order)
+  #   # try(print(input$data_state$order[[1]]))
+  #   # print(roworder)
+  #   if (is.null(isolate(input$data_rows_all))) {
+  #     roworder <- 1:nrow(vals$data)
+  #   } else {
+  #     roworder <- input$data_rows_all
+  #   }
+  #   print(isolate(input$data_rows_all))
+  # 
+  #   # order = list(list(5, "desc")), 
+  # 
+  # }
+
+  # conductor to call twitter search function
   observeEvent(
     input$searchButton,
     {
-      vals$data <- isolate(searchTwitter(input$inputQuery, as.numeric(input$number)))
-      if (!is.null(vals$data) && nrow(vals$data) > 0) {
-        vals$data <- flatten_tweets(vals$data)
-        if (verbose) {
-          View(vals$data)
-        }
-        render()
-        # vals$proxy <- dataTableProxy("data")
-      }
+      # only react to search button
+      isolate({
+        vals$tweets <- searchTwitter(input$inputQuery, as.numeric(input$number))  
+      })
     },
-    ignoreInit = TRUE)
+    ignoreInit = TRUE
+  )
 
+  observeEvent(input$labelButton,
+    {
+      if (length(input$data_rows_selected) && !is.null(vals$tweets) && nrow(vals$tweets)) {
+        
+        # only react to label button
+        isolate({
+          vals$tweets$label[input$data_rows_selected] <- paste(unlist(input$selectedLabel), collapse = " ")
+        })
+        # replaceData(vals$proxy, vals$data$label[input$data_rows_selected], resetPaging = FALSE)
+        # dataTableAjax(session, vals$data[,cols], rownames = FALSE, outputId = "data")
+        # reloadData(vals$proxy, resetPaging = FALSE)
+        # try(print(input$data_state$order[[1]]))
+      }
+    }
+  )
+  
   observeEvent(
     input$chooseDirectoryButton,
     {
-      vals$dirname <- choose.dir(".", caption="Select folder")
-      if (is.na(vals$dirname)) {
-        vals$dirname <- "data"
-      }
+      # manually select a folder and create it
+      folder <<- choose.dir("", caption="Select folder")
     },
-    ignoreInit = TRUE)
-  
+    ignoreInit = TRUE
+  )
+
   observeEvent(
     input$downloadTweetsButton,
     {
-      if (!is.null(vals$data) && nrow(vals$data) > 0) {
-        try(dir.create(vals$dirname, showWarnings = FALSE))
-        if (file.exists(paste(vals$dirname, "tweets.csv", sep="/"))) {
-          colnames = FALSE
-          append = TRUE
-        } else {
-          colnames = TRUE
-          append = FALSE
-        }
-        write.table(vals$data[input$data_rows_selected,-c(ncol(vals$data))], 
-                    paste(vals$dirname, "tweets.csv", sep="/"), sep = ",", row.names = FALSE, 
-                    fileEncoding = "UTF-8", append = append, col.names = colnames)  
+      
+      # check if a directory has already been chosen
+      if(!is.character(folder)) {
+        folder <<- choose.dir("", caption="Select folder")
       }
+      
+      isolate({
+        if (!is.null(vals$tweets) && nrow(vals$tweets)) {
+
+          # write tweets
+          writeTweets(folder, vals$tweets[input$data_rows_selected,-c(ncol(vals$tweets))])
+        }
+      })
+
     },
-    ignoreInit = TRUE)
-  
+    ignoreInit = TRUE
+  )
+
   observeEvent(
     input$downloadImagesButton,
     {
-      if (!is.null(vals$data) && nrow(vals$data) > 0) {
-        try(dir.create(vals$dirname, showWarnings = FALSE))
-        image_ids <- intersect(which(vals$data$media_type == "photo"),
-                               input$data_rows_selected)
-        if (length(image_ids)) {
-          image_tweets <- vals$data[image_ids, c("status_id", "media_url")]
-          apply(image_tweets, 1, function(x) try(download.file(x[2],
-                                                               paste(vals$dirname, "/", x[1],".jpg",sep=""), "auto", quiet = TRUE, mode = "wb")))
-        }
+      
+      # check if a directory has already been chosen
+      if(is.na(folder)) {
+        folder <<- choose.dir("", caption="Select folder")
       }
+      
+      isolate({
+        if (!is.null(vals$tweets) && nrow(vals$tweets)) {
+          
+          # get row_ids of tweets that contain a photo
+          image_ids <- intersect(which(vals$tweets$media_type == "photo"),
+                                 input$data_rows_selected)
+
+          if (length(image_ids)) {
+            writeImages(folder, vals$tweets[image_ids, c("status_id", "media_url")])
+          }
+        }
+      })
     },
-    ignoreInit = TRUE)
-  
-  observeEvent(input$labelButton,
-  {
-    if (length(input$data_rows_selected) && !is.null(vals$data) && nrow(vals$data > 0)) {
-      vals$data$label[input$data_rows_selected] <- paste(unlist(input$selectedLabel), collapse = " ")
-      render()
-      # replaceData(vals$proxy, vals$data$label[input$data_rows_selected], resetPaging = FALSE)
-      # dataTableAjax(session, vals$data[,cols], rownames = FALSE, outputId = "data")
-      # reloadData(vals$proxy, resetPaging = FALSE)
-      # try(print(input$data_state$order[[1]]))
-    }
-  },
-  ignoreInit = TRUE)
+    ignoreInit = TRUE
+  )
+
 })
 
 # output$image = renderUI({
