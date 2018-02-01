@@ -39,7 +39,23 @@ server <- shinyServer(function(input, output) {
 
   vals <- reactiveValues()
   vals$dirname <- "data"
-  
+
+  render <- function() {
+    # try(rsoworder <- input$data_state$order)
+    # try(print(input$data_state$order[[1]]))
+    # print(roworder)
+    # print(isolate(input$toList()))
+    output$data <- DT::renderDataTable(vals$data[,cols],
+                                       server = TRUE, 
+                                       escape = FALSE,
+                                       filter = "none",
+                                       options = list(searching=FALSE, caseInsensitive=TRUE, smart=TRUE, 
+                                                      columnDefs = list(list(targets = c(5), searchable=FALSE)),
+                                                      stateSave = FALSE)
+    # order = list(list(5, "desc")), 
+    )
+  }
+    
   observeEvent(
     input$searchButton,
     {
@@ -49,16 +65,8 @@ server <- shinyServer(function(input, output) {
         if (verbose) {
           View(vals$data)
         }
-        vals$data <- vals$data
-        output$data <- DT::renderDataTable({
-          return(vals$data[cols])
-        },
-        server = TRUE, 
-        escape = FALSE,
-        filter = "none",
-        options = list(searching=FALSE, caseInsensitive=TRUE, smart=TRUE, 
-                       columnDefs = list(list(targets = c(5), searchable=FALSE)))
-        )
+        render()
+        # vals$proxy <- dataTableProxy("data")
       }
     },
     ignoreInit = TRUE)
@@ -79,13 +87,15 @@ server <- shinyServer(function(input, output) {
       if (!is.null(vals$data) && nrow(vals$data) > 0) {
         try(dir.create(vals$dirname, showWarnings = FALSE))
         if (file.exists(paste(vals$dirname, "tweets.csv", sep="/"))) {
-          col.names = FALSE
+          colnames = FALSE
+          append = TRUE
         } else {
-          col.names = TRUE
+          colnames = TRUE
+          append = FALSE
         }
         write.table(vals$data[input$data_rows_selected,-c(ncol(vals$data))], 
                     paste(vals$dirname, "tweets.csv", sep="/"), sep = ",", row.names = FALSE, 
-                    fileEncoding = "UTF-8", append = TRUE, col.names = col.names)  
+                    fileEncoding = "UTF-8", append = append, col.names = colnames)  
       }
     },
     ignoreInit = TRUE)
@@ -101,17 +111,23 @@ server <- shinyServer(function(input, output) {
           image_tweets <- vals$data[image_ids, c("status_id", "media_url")]
           apply(image_tweets, 1, function(x) try(download.file(x[2],
                                                                paste(vals$dirname, "/", x[1],".jpg",sep=""), "auto", quiet = TRUE, mode = "wb")))
-        }  
+        }
       }
     },
     ignoreInit = TRUE)
   
-  observeEvent(
-    input$labelButton, {
+  observeEvent(input$labelButton,
+  {
+    if (length(input$data_rows_selected) && !is.null(vals$data) && nrow(vals$data > 0)) {
       vals$data$label[input$data_rows_selected] <- paste(unlist(input$selectedLabel), collapse = " ")
-    }, 
-    ignoreInit = TRUE)
-
+      render()
+      # replaceData(vals$proxy, vals$data$label[input$data_rows_selected], resetPaging = FALSE)
+      # dataTableAjax(session, vals$data[,cols], rownames = FALSE, outputId = "data")
+      # reloadData(vals$proxy, resetPaging = FALSE)
+      # try(print(input$data_state$order[[1]]))
+    }
+  },
+  ignoreInit = TRUE)
 })
 
 # output$image = renderUI({
