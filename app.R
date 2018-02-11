@@ -3,6 +3,13 @@ verbose   = FALSE
 cols      = c('status_id', 'created_at', 'user_id', 'screen_name', 'text', 'source', 'reply_to_status_id', 'reply_to_user_id', 'reply_to_screen_name', 'is_quote', 'is_retweet', 'favorite_count', 'retweet_count', 'hashtags', 'symbols', 'urls_url', 'urls_t.co', 'urls_expanded_url', 'media_url', 'media_t.co', 'media_expanded_url', 'media_type', 'ext_media_url', 'ext_media_t.co', 'ext_media_expanded_url', 'ext_media_type', 'mentions_user_id', 'mentions_screen_name', 'lang', 'quoted_status_id', 'quoted_text', 'retweet_status_id', 'retweet_text', 'place_url', 'place_name', 'place_full_name', 'place_type', 'country', 'country_code', 'geo_coords', 'coords_coords', 'bbox_coords', 'label', 'predicted', 'image')
 select = c('created_at', 'text', 'hashtags', 'lang', 'label', 'image')
 language  = NULL
+categories = list(biology = c("animals", "plants"), 
+                  climate = c("air_pressure", "clouds", "humidity", "ice", "precipitation", "severe_weather", "specific_climate_values", "temperature", "visibility_-_aerosols", "wind"), 
+                  economy = c("kind_of_goods", "market"), 
+                  environment = c("astronomy", "avalanche", "celestial_phenomena", "geophysics", "landslide", "wildfire"),
+                  hydrology = c("discharge", "erosion", "flash_flood", "flow_velocity", "irrigation_canals", "sediment_deposition", "storm_surge", "water_discoloration", "water_level", "water_temperature"), 
+                  phenology = c("animal_phenology", "number_of_animals", "plant_phenology", "seasons"), 
+                  society = c("affected_people", "damages", "human_health", "mitigation", "pollution", "reasoning", "religious_rituals", "social_problems", "traffic", "warnings"))
 
 library(shiny)
 library(DT)
@@ -114,7 +121,7 @@ shinyApp(
       sidebarPanel(
         textInput(inputId = "inputQuery", label = NULL, placeholder = "<Search query>", width="100%"),
         selectizeInput(inputId = "selectedLabel", label = NULL,
-                       choices = list(biology = c("animals", "plants")),
+                       choices = categories,
                        multiple = FALSE, size = 50,
                        options = list(
                          placeholder = "<Select label>",
