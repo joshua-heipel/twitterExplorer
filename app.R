@@ -255,7 +255,7 @@ shinyApp(
       input$importButton
       if (input$importButton) {
         filename <- choose.files("", caption="Select file", multi = FALSE)
-        if(!is.na(filename)) {
+        if(length(filename)) {
           dat <- read_csv(filename)
           data$table <- flattenTweets(dat)[cols]
         }
