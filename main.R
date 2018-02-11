@@ -1,5 +1,5 @@
 # install packages
-packages <- c("shiny", "rtweet", "DT", "shinyFiles")
+packages <- c("shiny", "rtweet", "DT", "readr")
 
 ipak <- function(pkg){
   new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
@@ -9,9 +9,11 @@ ipak <- function(pkg){
 
 ipak(packages)
 
-# load code
-source("ui.R")
-source("server.R")
 
-# run app
-shinyApp(ui, server)
+source("explorer.R")
+# # load code
+# source("ui.R")
+# source("server.R")
+# 
+# # run app
+# shinyApp(ui, server)
